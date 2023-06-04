@@ -1,5 +1,6 @@
 import Mathlib
 import Mathlib.Tactic.NthRewrite
+import Mathlib.Tactic.SimpRw
 
 variable (l m n: Type)
 variable [Fintype l][Fintype m][Fintype n][DecidableEq m][DecidableEq n][DecidableEq l]
@@ -75,4 +76,88 @@ end det
 
 section is_R_or_C
 
+scoped infixl:65 " ⊕ᵥ " => Sum.elim
+
+variable (𝕜 : Type) [IsROrC 𝕜]
+
+lemma schur_complement_eq₁₁ [Fintype m] [DecidableEq m] [Fintype n]
+  {A : Matrix m m 𝕜} (B : Matrix m n 𝕜) (D : Matrix n n 𝕜) (x : m → 𝕜) (y : n → 𝕜)
+  [Invertible A] (hA : A.IsHermitian) :
+vecMul (star (x ⊕ᵥ y)) (fromBlocks A B Bᴴ D) ⬝ᵥ (x ⊕ᵥ y) =
+  vecMul (star (x + (A⁻¹ ⬝ B).mulVec y)) A ⬝ᵥ (x + (A⁻¹ ⬝ B).mulVec y) +
+    vecMul (star y) (D - Bᴴ ⬝ A⁻¹ ⬝ B) ⬝ᵥ y := by
+  have hi := isUnit_det_of_invertible A
+  simp_rw [star_add, add_vecMul, vecMul_add, add_dotProduct, dotProduct_add, vecMul_sub, 
+    sub_dotProduct, star_mulVec, conjTranspose_mul, hA.inv.eq, conjTranspose_conjTranspose, 
+    dotProduct_mulVec, vecMul_vecMul,
+    nonsing_inv_mul_cancel_right _ _ hi, mul_nonsing_inv_cancel_left _ _ hi, 
+    ← Matrix.mul_assoc, ← add_sub_assoc]
+  simp_rw [Function.star_sum_elim, vecMul_fromBlocks, fromBlocks_mulVec, dotProduct_block, 
+    star_add, add_dotProduct, dotProduct_add, Sum.elim_comp_inl, Sum.elim_comp_inr, add_dotProduct]
+  abel
+
+lemma schur_complement_eq₂₂ [Fintype m] [Fintype n] [DecidableEq n]
+  (A : Matrix m m 𝕜) (B : Matrix m n 𝕜) {D : Matrix n n 𝕜} (x : m → 𝕜) (y : n → 𝕜)
+  [Invertible D] (hD : D.IsHermitian) :
+vecMul (star (x ⊕ᵥ y)) (fromBlocks A B Bᴴ D) ⬝ᵥ (x ⊕ᵥ y) =
+  vecMul (star ((D⁻¹ ⬝ Bᴴ).mulVec x + y)) D ⬝ᵥ ((D⁻¹ ⬝ Bᴴ).mulVec x + y) +
+    vecMul (star x) (A - B ⬝ D⁻¹ ⬝ Bᴴ) ⬝ᵥ x := by
+  have hi := isUnit_det_of_invertible D
+  simp_rw [star_add, add_vecMul, vecMul_add, add_dotProduct, dotProduct_add, vecMul_sub, 
+    sub_dotProduct, star_mulVec, conjTranspose_mul, hD.inv.eq, conjTranspose_conjTranspose, 
+    dotProduct_mulVec, vecMul_vecMul,
+    nonsing_inv_mul_cancel_right _ _ hi, mul_nonsing_inv_cancel_left _ _ hi, 
+    ← Matrix.mul_assoc, ← add_sub_assoc]
+  simp_rw [Function.star_sum_elim, vecMul_fromBlocks, fromBlocks_mulVec, dotProduct_block, 
+    star_add, add_dotProduct, dotProduct_add, Sum.elim_comp_inl, Sum.elim_comp_inr, add_dotProduct]
+  abel
+
+lemma IsHermitian.from_blocks₁₁ [Fintype m] [DecidableEq m]
+  {A : Matrix m m 𝕜} (B : Matrix m n 𝕜) (D : Matrix n n 𝕜)
+  (hA : A.IsHermitian) :
+  (Matrix.fromBlocks A B Bᴴ D).IsHermitian ↔ (D - Bᴴ ⬝ A⁻¹ ⬝ B).IsHermitian := by
+  simp_rw [ Matrix.isHermitian_fromBlocks_iff, IsHermitian, Matrix.conjTranspose_sub, 
+    conjTranspose_mul, conjTranspose_conjTranspose, hA.inv.eq, Matrix.mul_assoc, sub_left_inj,
+    eq_self_iff_true, hA.eq, true_and]
+
+lemma IsHermitian.from_blocks₂₂ [Fintype n] [DecidableEq n]
+  (A : Matrix m m 𝕜) (B : Matrix m n 𝕜) {D : Matrix n n 𝕜}
+  (hD : D.IsHermitian) :
+  (Matrix.fromBlocks A B Bᴴ D).IsHermitian ↔ (A - B ⬝ D⁻¹ ⬝ Bᴴ).IsHermitian := by
+  simp_rw [ Matrix.isHermitian_fromBlocks_iff, IsHermitian, Matrix.conjTranspose_sub, 
+    conjTranspose_mul, conjTranspose_conjTranspose, hD.inv.eq, Matrix.mul_assoc, sub_left_inj,
+    eq_self_iff_true, hD.eq, and_true]
+
+/- lemma pos_semidef.from_blocks₁₁ [Fintype m] [DecidableEq m] [Fintype n]
+  {A : Matrix m m 𝕜} (B : Matrix m n 𝕜) (D : Matrix n n 𝕜)
+  (hA : A.posDef) [Invertible A] :
+  (from_blocks A B Bᴴ D).pos_semidef ↔ (D - Bᴴ ⬝ A⁻¹ ⬝ B).pos_semidef := sorry -/
+/- begin
+  rw [pos_semidef, is_hermitian.from_blocks₁₁ _ _ hA.1],
+  split,
+  { refine λ h, ⟨h.1, λ x, _⟩,
+    have := h.2 (- ((A⁻¹ ⬝ B).mul_vec x) ⊕ᵥ x),
+    rw [dot_product_mul_vec, schur_complement_eq₁₁ B D _ _ hA.1, neg_add_self,
+      dot_product_zero, zero_add] at this,
+    rw [dot_product_mul_vec], exact this },
+  { refine λ h, ⟨h.1, λ x, _⟩,
+    rw [dot_product_mul_vec, ← sum.elim_comp_inl_inr x, schur_complement_eq₁₁ B D _ _ hA.1,
+      map_add],
+    apply le_add_of_nonneg_of_le,
+    { rw ← dot_product_mul_vec,
+      apply hA.pos_semidef.2, },
+    { rw ← dot_product_mul_vec, apply h.2 } }
+end -/
+
+/- lemma pos_semidef.from_blocks₂₂ [Fintype m] [Fintype n] [DecidableEq n]
+  (A : Matrix m m 𝕜) (B : Matrix m n 𝕜) {D : Matrix n n 𝕜}
+  (hD : D.pos_def) [Invertible D] :
+  (fromBlocks A B Bᴴ D).pos_semidef ↔ (A - B ⬝ D⁻¹ ⬝ Bᴴ).pos_semidef := sorry -/
+/- begin
+  rw [←pos_semidef_submatrix_equiv (equiv.sum_comm n m), equiv.sum_comm_apply,
+    from_blocks_submatrix_sum_swap_sum_swap],
+  convert pos_semidef.from_blocks₁₁ _ _ hD; apply_instance <|> simp
+end -/
+
 end is_R_or_C
+
